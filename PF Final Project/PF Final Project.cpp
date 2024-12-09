@@ -15,6 +15,8 @@ char chicken = '&';
 char spaceShip = '$';
 char shipFire = '*';
 char egg = '0';
+char powerUp = '#';
+int invincibilty = 50;
 int spaceShipPosX = rows - 1;
 int spaceShipPosY = cols / 2;
 bool isRight = true;
@@ -26,12 +28,13 @@ int lives = 3;
 
 //function prototypes
 void saveScore(string, int);
-void readScore();
 void displayScore();
 void gotoxy(int x, int y);											
 void intro();
 void menu();
 void masterFunc(char);
+void instructions();
+void exit();
 void initiGrid();
 void shipController(char);
 void fire();
@@ -46,10 +49,12 @@ void eggMove();
 void checkCollisions();
 void collisionDetected();
 void levelUp();
+void catchPowerUps();
 void gameCompleted();
 void gameOver();
 void startGame();
 void ShowConsoleCursor(bool);
+void resetGameState();
 
 //main func
 int main()
@@ -59,20 +64,110 @@ int main()
 }
 
 //save score (definition)
-void saveScore(string str, int score)
+void saveScore(string name, int score)
 {
+	const int S = 10;
+	string names[S] = { "" };
+	int scores[S];
+	int scoresDuplicate[S]; 
+	for (int i = 0; i < S; i++)
+	{
+		scores[i] = -1;
+		scoresDuplicate[i] = - 1;
+	}
+
+	for (int i = 0; name[i] != '\0'; i++)
+	{
+		if (name[i] == ' ')
+			name[i] = '-';
+	}
+
+	int i = 0;
+	bool isUpdated = false;
+	bool hasAddedNewUser = false;
+
+	ifstream fin("scores.txt");
+	if (fin.is_open())
+	{
+		while (i < S)
+		{
+			fin >> names[i] >> scores[i];
+			i++;
+		}
+	}
+	else {
+		cout << "file opening error";
+	}
+	fin.close();
+
+	for (int i = 0; i < S && scores[i] != -1; i++) {
+		if (!names[i].empty() && names[i] == name) {
+			if (score > scores[i]) {
+				scores[i] = score;
+			}
+			isUpdated = true;
+			break;
+		}
+	}
+
+	if (!isUpdated) {
+		for (int i = 0; i < S; i++) {
+			if (scores[i] == -1) {
+				names[i] = name;
+				scores[i] = score;
+				hasAddedNewUser = true;
+				break;
+			}
+		}
+	}
+
+	if (!isUpdated && !hasAddedNewUser) {
+		for (int i = 0; i < S; i++) {
+			if (scores[i] < score) {
+				names[i] = name;
+				scores[i] = score;
+				break;
+			}
+		}
+	}
+
+	for (int i = 0; i < S && scores[i] != -1; i++)
+	{
+		scoresDuplicate[i] = scores[i];
+	}
+
+	for (int i = 0;  i < S && scoresDuplicate[i] != -1 ; i++)
+	{
+		for (int j = i + 1; i < S && scoresDuplicate[j] != -1; j++)
+		{
+			if (scoresDuplicate[i] < scoresDuplicate[j])
+			{
+				int temp = scoresDuplicate[j];
+				scoresDuplicate[j] = scoresDuplicate[i];
+				scoresDuplicate[i] = temp;
+			}
+		}
+	}
+	
 	ofstream fout;
-	fout.open("scores.txt", ios::app);
+	fout.open("scores.txt");
 	if (!fout) {
 		cerr << "Error opening file!" << endl;
-		exit(0);
+		return;
 	}
-	for (int i = 0; str[i] != '\0'; i++)
+
+	for (int i = 0; i < S && scoresDuplicate[i] != -1; i++)
 	{
-		if (str[i] == ' ')
-			str[i] = '-';
+		for (int x = 0; x < S; x++) {
+			if (scores[x] == scoresDuplicate[i]) {
+				fout << names[x] << " " << scores[x] << endl;
+				scores[x] = -1;
+				names[x] = "";
+				break;
+			}
+		}
 	}
-	fout << str << " " << score << endl;
+	
 	fout.close();
 }
 
@@ -80,41 +175,28 @@ void displayScore()
 {
 	string line;
     ifstream fout("scores.txt");
+	cout << "\n\tPlayer Name\tScores" << endl;
+	cout << "------------------------------------" << endl;
 	if (fout.is_open())
 	{
 		while (getline(fout, line))
 		{
 			for (int i = 0; line[i] != '\0'; i++)
 			{
+				if (line[i] == ' ')
+					line[i] = '\t';
 				if (line[i] == '-')
 					line[i] = ' ';
 			}
-			cout << line << endl;
+			cout << "\t" << line << endl;
 		}
 	}
 	else
 		cout << "file opening error";
     fout.close();
-}
-
-void readScore()
-{
-	string name, line;
-	int score;
-	ifstream fout("scores.txt");
-	if (fout.is_open())
-	{
-		while (getline(fout,line))
-		{
-			fout >> name >> score;
-			cout << name << " " << score;
-			cout << endl;
-		}
-	}
-	else
-		cout << "file opening error";
-	fout.close();
 	_getch();
+	system("cls");
+	menu();
 }
 
 //intro func (definition)
@@ -125,10 +207,10 @@ void intro()
 	for (int i = 0; i < 5; i++)
 	{
 		cout << ".";
-		Sleep(50);
+		Sleep(500);
 	}
 	cout << "Completed";
-	Sleep(50);
+	Sleep(500);
 	system("cls");
 	cout << "\n\n\t\t\t\tEnter player name : ";
 	getline(cin, playerName);
@@ -139,6 +221,7 @@ void intro()
 //menu func (definition)
 void menu()
 {
+	system("cls");
 	char userInput;
 	bool flag = true;
 	cout << endl;
@@ -171,15 +254,14 @@ void masterFunc(char userInput)
 		startGame();
 		break;
 	case '2':
-		cout << "Coming soon ";
+		displayScore();
 		break;
 	case '3':
-		cout << "Coming soon ";
+		instructions();
 		break;
 	case '4':
-		cout << "Coming soon ";
+		exit();
 		break;
-
 	}
 }
 
@@ -188,6 +270,13 @@ void startGame() {
 	initiGrid();
 	while (isGameRunning)
 	{
+		if (invincibilty > 0) {
+			invincibilty--;
+			if (invincibilty % 5 == 0)
+				grid[spaceShipPosX][spaceShipPosY] = ' ';
+			else
+				grid[spaceShipPosX][spaceShipPosY] = spaceShip;
+		}
 		checkCollisions();
 		displayGrid();
 		moveFire();
@@ -268,6 +357,19 @@ void initiGrid()
 	grid[spaceShipPosX][spaceShipPosY] = spaceShip;
 }
 
+void instructions()
+{
+	cout << "\t\tGUIDLINES" << endl;
+	cout << "-------------------------------------" << endl << endl;
+	cout << "\n -> 'W' to move your space ship Above" << endl;
+	cout << "\n -> 'S' to move your space ship Down" << endl;
+	cout << "\n -> 'D' to move your space ship Right" << endl;
+	cout << "\n -> 'A' to move your space ship Left" << endl;
+	cout << "\n\n Press any key to continue...";
+	_getch();
+	menu();
+}
+
 //displayGrid func (definition)
 void displayGrid()
 {
@@ -284,8 +386,13 @@ void displayGrid()
 	for (int i = 0; i < cols; i++)
 		cout << "_";
 	cout << '|' << endl << endl;
-	cout << " Player name :" << ::playerName << endl;
+	cout << " Player name :" << ::playerName;
+	if (invincibilty > 0)
+		cout << "\t\tYou are invincible for : " << invincibilty << " frames" << endl;
+	else
+		cout <<"                                                                        " << endl;
 	cout << " Scores : " << _scores << "\tLevel : " << level << "\tLives : " << lives;
+
 }
 
 //ship controller func (definition)
@@ -317,6 +424,10 @@ void shipController(char ch)
 			spaceShipPosX++;
 		break;
 	}
+
+	if (grid[spaceShipPosX][spaceShipPosY] == chicken)
+		collisionDetected();
+
 	grid[spaceShipPosX][spaceShipPosY] = spaceShip;
 }
 
@@ -417,8 +528,11 @@ void eggDrop()
 		{
 			if (grid[i][j] == chicken)
 			{
-				if (rand() % divisors[level] == 0)
+				if (rand() % 97 == 0)
+					grid[++i][j] = powerUp;
+				else if (rand() % divisors[level] == 0)
 					grid[++i][j] = egg;
+
 			}
 		}
 	}
@@ -431,29 +545,41 @@ void eggMove()
 	{
 		for (int j = 0; j < cols; j++)
 		{
-			if (grid[i][j] == egg)
+			if (grid[i][j] == egg || grid[i][j] == powerUp)
 			{
+				char c = grid[i][j];
 				grid[i][j] = ' ';
-
 				if (++i == rows)
 					continue;
-
-				if (grid[i][j] == spaceShip) {
-					lives--;
+				if (grid[i][j] == spaceShip && c != powerUp) {
+					collisionDetected();
 					continue;
 				}
-
+				else if (grid[i][j] == spaceShip && c == powerUp) {
+					c = ' ';
+					catchPowerUps();
+				}
 				while (i < rows && grid[i][j] != ' ')
 				{
 					i++;
 				}
 				if (i < rows)
-					grid[i][j] = egg;
+					grid[i][j] = c;
 			}
 		}
 	}
 }
 
+void catchPowerUps()
+{
+	int reward = rand() % 400 + 100;
+	if (rand() % 2 == 0)
+	{
+		_scores += reward;
+	}
+	else
+		invincibilty = 50;
+}
 //fire func (definition)
 void fire()
 {
@@ -489,13 +615,11 @@ void checkCollisions()
 	//chicken collision
 	if (spaceShipPosY > 0 && grid[spaceShipPosX][spaceShipPosY - 1] == chicken)
 	{
-		Sleep(1000);
 		grid[spaceShipPosX][spaceShipPosY - 1] = ' ';
 		collisionDetected();
 	}
 	else if (spaceShipPosY < (cols-1) && grid[spaceShipPosX][spaceShipPosY + 1] == chicken)
 	{
-		Sleep(1000);
 		grid[spaceShipPosX][spaceShipPosY + 1] = ' ';
 		collisionDetected();
 	}
@@ -504,8 +628,11 @@ void checkCollisions()
 //check collision func (definition)
 void collisionDetected()
 {
+	if (invincibilty > 0)
+		return;
+	Sleep(1000);
 	lives--;
-	if (lives == 0)
+	if (lives <= 0)
 		gameOver();
 }
 
@@ -533,7 +660,10 @@ void gameCompleted()
 	cout << "\n\n\n\t\t\t\t\t-*-*-*-THE END-*-*-*-" << endl;
 	cout << "\t\t\t\t\tYou have completed the whole World!" << endl;
 	cout << "\t\t\t\t\tYour score is : " << _scores << endl;
+	saveScore(playerName, _scores);
+	resetGameState();
 	_getch();
+	menu();
 }
 
 //game over func (definition)
@@ -544,7 +674,27 @@ void gameOver()
 	cout << "\n\n\n\t\t\t\t\tGAME OVER!" << endl;
 	cout << "\t\t\t\t\tYou have lost all your lives!" << endl;
 	cout << "\t\t\t\t\tYour score is : " << _scores << endl;
+	saveScore(playerName, _scores);
+	resetGameState();
 	_getch();
+	menu();
+}
+
+void exit()
+{
+	isGameRunning = false;
+	system("cls");
+	cout << "\n\t Thankyou for playing!" << endl;
+	_getch();
+	exit(0);
+}
+
+void resetGameState() {
+	_scores = 0;
+	lives = 3;
+	isGameRunning = true;
+	spaceShipPosX = rows - 1;
+	spaceShipPosY = cols / 2;
 }
 
 //gotoxy func (definition)
